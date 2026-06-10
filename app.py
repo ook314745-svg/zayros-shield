@@ -25,31 +25,22 @@ def generate_script_id():
     return "".join(random.choices(string.ascii_letters + string.digits, k=24))
 
 def luraph_obfuscate(lua_code, script_id):
-    """
-    Luraph-style multi-layer obfuscation:
-    1. String encryption (XOR + base64)
-    2. Control flow flattening simulation
-    3. Anti-tamper checksum
-    4. VM-style bytecode wrapper
-    5. Anti-decompilation layers
-    """
-
-    # Layer 1: Encrypt strings with dynamic key
     key = hashlib.sha256(script_id.encode()).hexdigest()[:32]
 
     def xor_encrypt(data, key):
         return "".join(chr(ord(c) ^ ord(key[i % len(key)])) for i, c in enumerate(data))
 
     encrypted_payload = base64.b64encode(xor_encrypt(lua_code, key).encode()).decode()
+    checksum = hashlib.sha256(lua_code.encode()).hexdigest()[:16]
 
-    # Layer 2: VM-style loader with anti-tamper
-    vm_loader = f"""
--- ZAYROS PROTECTION SYSTEM | ID: {script_id}
+    # Build Lua VM loader using regular string (not f-string) to avoid brace conflicts
+    vm_loader = """
+-- ZAYROS PROTECTION SYSTEM | ID: {sid}
 -- Luraph-Level Obfuscation | Anti-Tamper | Anti-Decompile
 local _Z = {{}}
 local _K = "{key}"
-local _E = "{encrypted_payload}"
-local _C = "{hashlib.sha256(lua_code.encode()).hexdigest()[:16]}"
+local _E = "{enc}"
+local _C = "{chk}"
 
 local function _D(s, k)
     local r = ""
@@ -62,7 +53,7 @@ end
 local function _X(str)
     local b = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
     str = string.gsub(str, '[^'..b..'=]', '')
-    local r = {}
+    local r = {{}}
     for i = 1, #str, 4 do
         local c1, c2, c3, c4 = string.byte(str, i, i+3)
         c1, c2 = b:find(string.char(c1))-1, (b:find(string.char(c2)) or 1)-1
@@ -76,38 +67,35 @@ end
 
 -- Anti-tamper: Verify checksum
 local _V = _D(_X(_E), _K)
-if _C ~= "{hashlib.sha256(lua_code.encode()).hexdigest()[:16]}" then
-    while true do end  -- Kill if tampered
+if _C ~= "{chk}" then
+    while true do end
 end
 
 -- Execute protected payload
 local _F = loadstring or load
 local _R = _F(_V)
 if _R then _R() end
-"""
+""".format(sid=script_id, key=key, enc=encrypted_payload, chk=checksum)
 
-    # Layer 3: Additional junk code injection + control flow
-    junk_vars = "".join([f"local _J{i} = function() return {random.randint(1000,9999)} end
-" for i in range(50)])
+    junk_vars = "".join(["local _J" + str(i) + " = function() return " + str(random.randint(1000,9999)) + " end\n" for i in range(50)])
 
-    # Layer 4: String table obfuscation
     string_table = {}
     for word in lua_code.split():
         if len(word) > 3 and word.isalpha():
             string_table[word] = base64.b64encode(word.encode()).decode()
 
-    final_code = f"""
--- ZAYROS SHIELD v3.0 | Script ID: {script_id}
+    final_code = """
+-- ZAYROS SHIELD v3.0 | Script ID: {sid}
 -- Protected by ZAYROS Anti-Leak System
 -- Any attempt to modify will result in script termination
 
-{junk_vars}
+{junk}
 
-local _ST = {json.dumps(string_table)}
+local _ST = {st}
 local _G = getfenv()
 _G._ZAYROS_PROTECTED = true
 
-{vm_loader}
+{vm}
 
 -- Anti-debug hooks
 local _old_gc = collectgarbage
@@ -115,13 +103,13 @@ local function _gc_hook()
     if debug.getinfo(2) then while true do end end
     return _old_gc()
 end
-"""
+""".format(sid=script_id, junk=junk_vars, st=json.dumps(string_table), vm=vm_loader)
 
     return final_code
 
 def generate_loadstring(script_id, domain=""):
     base_url = domain if domain else request.host_url.rstrip('/')
-    return f'loadstring(game:HttpGet("{base_url}/api/execute/{script_id}"))()'
+    return 'loadstring(game:HttpGet("' + base_url + '/api/execute/' + script_id + '"))()'
 
 @app.route('/')
 def index():
@@ -132,7 +120,7 @@ def auth():
     data = request.get_json()
     pwd = data.get('password', '')
     if hashlib.sha256(pwd.encode()).hexdigest() == OWNER_PASSWORD_HASH:
-        token = hashlib.sha256(f"{pwd}{time.time()}".encode()).hexdigest()
+        token = hashlib.sha256((pwd + str(time.time())).encode()).hexdigest()
         return jsonify({"status": "success", "token": token})
     return jsonify({"status": "failed"}), 401
 
@@ -160,7 +148,6 @@ def create_script():
     raw_code = data.get('code', '')
     name = data.get('name', 'Untitled')
 
-    # Obfuscate
     protected_code = luraph_obfuscate(raw_code, script_id)
 
     script_data = {
@@ -173,12 +160,11 @@ def create_script():
         "loadstring": generate_loadstring(script_id)
     }
 
-    with open(os.path.join(SCRIPTS_DIR, f"{script_id}.json"), 'w') as f:
+    with open(os.path.join(SCRIPTS_DIR, script_id + ".json"), 'w') as f:
         json.dump(script_data, f)
 
-    # Log
     with open(os.path.join(LOGS_DIR, "access.log"), 'a') as f:
-        f.write(f"[{datetime.now()}] Created script: {script_id}\n")
+        f.write("[" + str(datetime.now()) + "] Created script: " + script_id + "\n")
 
     return jsonify({
         "status": "success",
@@ -190,7 +176,7 @@ def create_script():
 @app.route('/api/scripts/<script_id>', methods=['PUT'])
 def update_script(script_id):
     data = request.get_json()
-    path = os.path.join(SCRIPTS_DIR, f"{script_id}.json")
+    path = os.path.join(SCRIPTS_DIR, script_id + ".json")
 
     if not os.path.exists(path):
         return jsonify({"status": "not_found"}), 404
@@ -215,7 +201,7 @@ def update_script(script_id):
 
 @app.route('/api/scripts/<script_id>/toggle', methods=['POST'])
 def toggle_script(script_id):
-    path = os.path.join(SCRIPTS_DIR, f"{script_id}.json")
+    path = os.path.join(SCRIPTS_DIR, script_id + ".json")
 
     if not os.path.exists(path):
         return jsonify({"status": "not_found"}), 404
@@ -232,7 +218,7 @@ def toggle_script(script_id):
 
 @app.route('/api/scripts/<script_id>', methods=['DELETE'])
 def delete_script(script_id):
-    path = os.path.join(SCRIPTS_DIR, f"{script_id}.json")
+    path = os.path.join(SCRIPTS_DIR, script_id + ".json")
     if os.path.exists(path):
         os.remove(path)
         return jsonify({"status": "success"})
@@ -240,7 +226,7 @@ def delete_script(script_id):
 
 @app.route('/api/execute/<script_id>')
 def execute_script(script_id):
-    path = os.path.join(SCRIPTS_DIR, f"{script_id}.json")
+    path = os.path.join(SCRIPTS_DIR, script_id + ".json")
 
     if not os.path.exists(path):
         return "-- Script not found", 404
@@ -251,15 +237,14 @@ def execute_script(script_id):
     if script_data.get('status') == 'disabled':
         return "-- Script is disabled by owner", 403
 
-    # Log execution
     with open(os.path.join(LOGS_DIR, "executions.log"), 'a') as f:
-        f.write(f"[{datetime.now()}] Executed: {script_id} | IP: {request.remote_addr}\n")
+        f.write("[" + str(datetime.now()) + "] Executed: " + script_id + " | IP: " + str(request.remote_addr) + "\n")
 
     return script_data['protected_code'], 200, {'Content-Type': 'text/plain'}
 
 @app.route('/api/scripts/<script_id>/raw')
 def get_raw(script_id):
-    path = os.path.join(SCRIPTS_DIR, f"{script_id}.json")
+    path = os.path.join(SCRIPTS_DIR, script_id + ".json")
     if os.path.exists(path):
         with open(path) as f:
             data = json.load(f)
