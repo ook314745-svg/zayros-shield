@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⚡ ZAYROS | Lua Shield</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg: #0a0a0f;
+            --bg2: #12121a;
+            --bg3: #1a1a2e;
+            --accent: #ff0040;
+            --accent2: #ff3366;
+            --accent-glow: rgba(255, 0, 64, 0.3);
+            --text: #e0e0e0;
+            --text2: #888;
+            --border: #2a2a3e;
+            --success: #00ff88;
+            --danger: #ff0040;
+            --warning: #ffaa00;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Login Gate */
+        #gate {
+            position: fixed;
+            inset: 0;
+            background: var(--bg);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            transition: opacity 0.6s ease;
+        }
+
+        #gate.hidden { opacity: 0; pointer-events: none; }
+
+        .gate-logo {
+            font-size: 4rem;
+            font-weight: 900;
+            background: linear-gradient(135deg, var(--accent), var(--accent2), #ff6b8a);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+            letter-spacing: -2px;
+            text-shadow: 0 0 60px var(--accent-glow);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .gate-sub {
+            color: var(--text2);
+            font-size: 0.9rem;
+            margin-bottom: 3rem;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+        }
+
+        .gate-input {
+            background: var(--bg3);
+            border: 2px solid var(--border);
+            color: var(--text);
+            padding: 1rem 1.5rem;
+            font-size: 1rem;
+            font-family: inherit;
+            width: 320px;
+            border-radius: 8px;
+            outline: none;
+            transition: all 0.3s ease;
+            text-align: center;
+            letter-spacing: 2px;
+        }
+
+        .gate-input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 20px var(--accent-glow);
+        }
+
+        .gate-btn {
+            margin-top: 1.5rem;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            border: none;
+            color: white;
+            padding: 1rem 3rem;
+            font-size: 1rem;
+            font-family: inherit;
+            font-weight: 700;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .gate-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 40px var(--accent-glow);
+        }
+
+        .gate-error {
+            color: var(--danger);
+            margin-top: 1rem;
+            font-size: 0.85rem;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .gate-error.show { opacity: 1; }
+
+        /* Main App */
+        #app { display: none; }
+        #app.active { display: block; }
+
+        .header {
+            background: var(--bg2);
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-logo {
+            font-size: 1.5rem;
+            font-weight: 900;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header-status {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+            box-shadow: 0 0 10px var(--success);
+            animation: blink 2s infinite;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+
+        @media (max-width: 900px) {
+            .grid { grid-template-columns: 1fr; }
+        }
+
+        .panel {
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .panel-header {
+            background: var(--bg3);
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .panel-title {
+            font-size: 0.9rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--text);
+        }
+
+        .panel-body { padding: 1.5rem; }
+
+        .editor {
+            width: 100%;
+            min-height: 400px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-family: inherit;
+            font-size: 0.85rem;
+            line-height: 1.6;
+            padding: 1rem;
+            resize: vertical;
+            outline: none;
+            tab-size: 4;
+        }
+
+        .editor:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 15px rgba(255, 0, 64, 0.1);
+        }
+
+        .btn {
+            padding: 0.7rem 1.5rem;
+            border: none;
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 0.85rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 5px 20px var(--accent-glow);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #00cc66, var(--success));
+            color: white;
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #cc0033, var(--danger));
+            color: white;
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, #cc8800, var(--warning));
+            color: white;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .script-name-input {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 0.7rem 1rem;
+            font-family: inherit;
+            border-radius: 6px;
+            outline: none;
+            width: 100%;
+            margin-bottom: 1rem;
+        }
+
+        .script-name-input:focus {
+            border-color: var(--accent);
+        }
+
+        .vault {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .vault::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .vault::-webkit-scrollbar-track {
+            background: var(--bg);
+        }
+
+        .vault::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 3px;
+        }
+
+        .script-card {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+            transition: all 0.2s ease;
+        }
+
+        .script-card:hover {
+            border-color: var(--accent);
+            transform: translateX(4px);
+        }
+
+        .script-card.disabled {
+            opacity: 0.4;
+            border-color: var(--danger);
+        }
+
+        .script-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .script-name {
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+
+        .script-id {
+            font-size: 0.7rem;
+            color: var(--text2);
+            font-family: monospace;
+        }
+
+        .script-actions {
+            display: flex;
+            gap: 0.4rem;
+            margin-top: 0.75rem;
+        }
+
+        .script-actions .btn {
+            padding: 0.4rem 0.8rem;
+            font-size: 0.75rem;
+        }
+
+        .loadstring-box {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1rem;
+            font-family: monospace;
+            font-size: 0.8rem;
+            color: var(--accent2);
+            word-break: break-all;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .loadstring-box:hover {
+            border-color: var(--accent);
+        }
+
+        .loadstring-box::after {
+            content: "Click to Copy";
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            font-size: 0.65rem;
+            color: var(--text2);
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .loadstring-box:hover::after {
+            opacity: 1;
+        }
+
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2rem;
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
+        }
+
+        .modal-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            color: var(--accent);
+        }
+
+        .modal-text {
+            color: var(--text2);
+            margin-bottom: 1.5rem;
+            line-height: 1.6;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: var(--bg3);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--success);
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            transform: translateX(150%);
+            transition: transform 0.3s ease;
+            z-index: 2000;
+            font-size: 0.85rem;
+        }
+
+        .toast.show {
+            transform: translateX(0);
+        }
+
+        .stats-bar {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 900;
+            color: var(--accent);
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text2);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 0.25rem;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: var(--text2);
+        }
+
+        .empty-state svg {
+            width: 48px;
+            height: 48px;
+            margin-bottom: 1rem;
+            opacity: 0.3;
+        }
+
+        .protected-preview {
+            max-height: 200px;
+            overflow: auto;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            font-size: 0.75rem;
+            color: var(--text2);
+            margin-top: 1rem;
+            font-family: monospace;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+    <!-- Login Gate -->
+    <div id="gate">
+        <div class="gate-logo">⚡ ZAYROS</div>
+        <div class="gate-sub">Lua Script Shield System</div>
+        <input type="password" class="gate-input" id="ownerPass" placeholder="OWNER PASSWORD" onkeypress="if(event.key==='Enter')auth()">
+        <button class="gate-btn" onclick="auth()">ENTER</button>
+        <div class="gate-error" id="gateError">Invalid password. Access denied.</div>
+    </div>
+
+    <!-- Main App -->
+    <div id="app">
+        <div class="header">
+            <div class="header-logo">⚡ ZAYROS</div>
+            <div class="header-status">
+                <div class="status-dot"></div>
+                <span style="font-size:0.8rem;color:var(--text2)">SYSTEM ONLINE</span>
+            </div>
+        </div>
+
+        <div class="container">
+            <div class="stats-bar">
+                <div class="stat-card">
+                    <div class="stat-value" id="statTotal">0</div>
+                    <div class="stat-label">Total Scripts</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="statActive">0</div>
+                    <div class="stat-label">Active</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="statProtected">0</div>
+                    <div class="stat-label">Protected</div>
+                </div>
+            </div>
+
+            <div class="grid">
+                <!-- Editor Panel -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <span class="panel-title">🔒 Script Protector</span>
+                        <div class="btn-group">
+                            <button class="btn btn-primary" onclick="saveScript()">PROTECT & SAVE</button>
+                            <button class="btn btn-warning" onclick="clearEditor()">CLEAR</button>
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <input type="text" class="script-name-input" id="scriptName" placeholder="Script Name (e.g., Aimbot v2.0)">
+                        <textarea class="editor" id="scriptCode" placeholder="-- Paste your Lua script here...
+-- ZAYROS will encrypt & obfuscate it with Luraph-level protection
+-- Anti-leak | Anti-decompile | Anti-tamper
+
+print('Hello from ZAYROS Shield')"
+></textarea>
+                        <div id="resultArea" style="display:none;">
+                            <div class="loadstring-box" id="loadstringBox" onclick="copyLoadstring()">
+                                <span id="loadstringText"></span>
+                            </div>
+                            <div class="protected-preview" id="protectedPreview"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Vault Panel -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <span class="panel-title">📦 Script Vault</span>
+                        <button class="btn btn-primary" onclick="loadVault()">🔄 REFRESH</button>
+                    </div>
+                    <div class="panel-body">
+                        <div class="vault" id="vault">
+                            <div class="empty-state">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                                </svg>
+                                <div>No scripts yet. Protect your first script.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal-overlay" id="modal">
+        <div class="modal">
+            <div class="modal-title" id="modalTitle">Generate Loadstring?</div>
+            <div class="modal-text" id="modalText">Your script has been protected. Would you like to generate the loadstring for executor compatibility?</div>
+            <div class="modal-buttons">
+                <button class="btn btn-success" id="modalYes" onclick="">YES</button>
+                <button class="btn btn-danger" onclick="closeModal()">NO</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast">Copied to clipboard!</div>
+
+    <script>
+        const API_BASE = window.location.origin;
+        let currentScriptId = null;
+        let currentLoadstring = null;
+
+        function auth() {
+            const pass = document.getElementById('ownerPass').value;
+            fetch(`${API_BASE}/api/auth`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({password: pass})
+            })
+            .then(r => r.json())
+            .then(d => {
+                if (d.status === 'success') {
+                    document.getElementById('gate').classList.add('hidden');
+                    document.getElementById('app').classList.add('active');
+                    loadVault();
+                } else {
+                    document.getElementById('gateError').classList.add('show');
+                }
+            });
+        }
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 2500);
+        }
+
+        function showModal(title, text, onYes) {
+            document.getElementById('modalTitle').textContent = title;
+            document.getElementById('modalText').textContent = text;
+            document.getElementById('modalYes').onclick = () => { onYes(); closeModal(); };
+            document.getElementById('modal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('modal').classList.remove('active');
+        }
+
+        function saveScript() {
+            const name = document.getElementById('scriptName').value || 'Untitled';
+            const code = document.getElementById('scriptCode').value;
+
+            if (!code.trim()) {
+                showToast('Paste script code first!');
+                return;
+            }
+
+            fetch(`${API_BASE}/api/scripts`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({name: name, code: code})
+            })
+            .then(r => r.json())
+            .then(d => {
+                if (d.status === 'success') {
+                    currentScriptId = d.id;
+                    currentLoadstring = d.loadstring;
+
+                    showModal(
+                        'Script Protected!',
+                        'Your script is now encrypted with Luraph-level obfuscation. Generate loadstring?',
+                        () => {
+                            document.getElementById('resultArea').style.display = 'block';
+                            document.getElementById('loadstringText').textContent = d.loadstring;
+                            document.getElementById('protectedPreview').textContent = d.protected_code.substring(0, 800) + '...
+
+[ENCRYPTED - FULL CODE HIDDEN]';
+                            showToast('Loadstring generated!');
+                        }
+                    );
+                    loadVault();
+                }
+            });
+        }
+
+        function copyLoadstring() {
+            if (currentLoadstring) {
+                navigator.clipboard.writeText(currentLoadstring);
+                showToast('Loadstring copied!');
+            }
+        }
+
+        function clearEditor() {
+            document.getElementById('scriptName').value = '';
+            document.getElementById('scriptCode').value = '';
+            document.getElementById('resultArea').style.display = 'none';
+            currentScriptId = null;
+            currentLoadstring = null;
+        }
+
+        function loadVault() {
+            fetch(`${API_BASE}/api/scripts`)
+            .then(r => r.json())
+            .then(scripts => {
+                const vault = document.getElementById('vault');
+
+                document.getElementById('statTotal').textContent = scripts.length;
+                document.getElementById('statActive').textContent = scripts.filter(s => s.status === 'enabled').length;
+                document.getElementById('statProtected').textContent = scripts.length;
+
+                if (scripts.length === 0) {
+                    vault.innerHTML = `
+                        <div class="empty-state">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                            </svg>
+                            <div>No scripts yet. Protect your first script.</div>
+                        </div>`;
+                    return;
+                }
+
+                vault.innerHTML = scripts.map(s => `
+                    <div class="script-card ${s.status === 'disabled' ? 'disabled' : ''}">
+                        <div class="script-card-header">
+                            <span class="script-name">${s.name}</span>
+                            <span class="script-id">${s.id.substring(0, 12)}...</span>
+                        </div>
+                        <div style="font-size:0.75rem;color:var(--text2);margin-bottom:0.5rem;">
+                            ${s.status === 'enabled' ? '🟢 ACTIVE' : '🔴 DISABLED'} | ${new Date(s.created).toLocaleDateString()}
+                        </div>
+                        <div class="script-actions">
+                            <button class="btn btn-primary" onclick="editScript('${s.id}')">EDIT</button>
+                            <button class="btn ${s.status === 'enabled' ? 'btn-danger' : 'btn-success'}" onclick="toggleScript('${s.id}')">${s.status === 'enabled' ? 'DISABLE' : 'ENABLE'}</button>
+                            <button class="btn btn-warning" onclick="copyLoadstringById('${s.id}')">COPY</button>
+                            <button class="btn btn-danger" onclick="deleteScript('${s.id}')">DELETE</button>
+                        </div>
+                    </div>
+                `).join('');
+            });
+        }
+
+        function editScript(id) {
+            fetch(`${API_BASE}/api/scripts/${id}/raw`)
+            .then(r => r.json())
+            .then(d => {
+                document.getElementById('scriptName').value = '';
+                document.getElementById('scriptCode').value = d.raw;
+                document.getElementById('resultArea').style.display = 'none';
+                currentScriptId = id;
+                showToast('Loaded for editing. Click PROTECT & SAVE to update.');
+            });
+        }
+
+        function toggleScript(id) {
+            fetch(`${API_BASE}/api/scripts/${id}/toggle`, {method: 'POST'})
+            .then(r => r.json())
+            .then(d => {
+                showToast(`Script ${d.new_status.toUpperCase()}!`);
+                loadVault();
+            });
+        }
+
+        function copyLoadstringById(id) {
+            const loadstring = `loadstring(game:HttpGet("${API_BASE}/api/execute/${id}"))()`;
+            navigator.clipboard.writeText(loadstring);
+            showToast('Loadstring copied!');
+        }
+
+        function deleteScript(id) {
+            if (!confirm('Delete this script permanently?')) return;
+            fetch(`${API_BASE}/api/scripts/${id}`, {method: 'DELETE'})
+            .then(r => r.json())
+            .then(() => {
+                showToast('Script deleted!');
+                loadVault();
+            });
+        }
+
+        // Tab key support in textarea
+        document.getElementById('scriptCode').addEventListener('keydown', function(e) {
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                const start = this.selectionStart;
+                const end = this.selectionEnd;
+                this.value = this.value.substring(0, start) + '    ' + this.value.substring(end);
+                this.selectionStart = this.selectionEnd = start + 4;
+            }
+        });
+    </script>
+</body>
+</html>
